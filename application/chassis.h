@@ -5,7 +5,10 @@
 #ifndef TEXT1_CHASSIS_H
 #define TEXT1_CHASSIS_H
 
-void ChassisInit(void);
+#include "bsp_can.h"
+#include "motor_def.h"
+
+void ChassisInit(Motor_Type_e motor_type);
 void ChassisSetRef(void);
 
 #endif //TEXT1_CHASSIS_H

@@ -52,6 +52,9 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     application/chassis.c
+    application/display_app.c
+    bsp/Display/OLED.c
+    bsp/Display/OLED_Data.c
     moudules/controller.c
     moudules/daemon.c
     moudules/dji_motor.c
@@ -72,6 +75,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     bsp/can
     bsp/dwt
     bsp/log
+    bsp/Display
     SEGGER/RTT
     SEGGER/Config
 )

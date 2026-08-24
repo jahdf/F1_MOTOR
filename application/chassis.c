@@ -10,7 +10,7 @@
 #include "motor_def.h"
 static DJIMotorInstance *motor_lf, *motor_rf, *motor_lb, *motor_rb;
 
-void ChassisInit() {
+void ChassisInit(Motor_Type_e motor_type) {
     // 四个轮子的参数一样,改tx_id和反转标志位即可
     Motor_Init_Config_s chassis_motor_config = {
         .can_init_config.can_handle = &hcan,
@@ -39,7 +39,7 @@ void ChassisInit() {
     .close_loop_type = SPEED_LOOP, // CURRENT_LOOP,
     .power_limit_flag = POWER_LIMIT_ON,
 },
-.motor_type = M3508,
+.motor_type = motor_type,
 .motor_control_type =  CURRENT_CONTROL
 };
     //右前

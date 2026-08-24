@@ -9,8 +9,9 @@
 #include "user_lib.h"
 #include "motor_def.h"
 static DJIMotorInstance *motor_lf, *motor_rf, *motor_lb, *motor_rb;
+static uint8_t chassis_enabled;
 
-void ChassisInit() {
+void ChassisInit(Motor_Type_e motor_type) {
     // 四个轮子的参数一样,改tx_id和反转标志位即可
     Motor_Init_Config_s chassis_motor_config = {
         .can_init_config.can_handle = &hcan,
@@ -39,7 +40,7 @@ void ChassisInit() {
     .close_loop_type = SPEED_LOOP, // CURRENT_LOOP,
     .power_limit_flag = POWER_LIMIT_ON,
 },
-.motor_type = M3508,
+.motor_type = motor_type,
 .motor_control_type =  CURRENT_CONTROL
 };
     //右前
@@ -70,12 +71,29 @@ void ChassisInit() {
     chassis_motor_config.controller_param_init_config.speed_PID.Ki = 0;
     chassis_motor_config.controller_param_init_config.speed_PID.Kd = 0.001f;
     motor_rb = DJIMotorInit(&chassis_motor_config);
+    chassis_enabled = 0U;
+    ChassisSetEnabled(0U);
 }
- float speed = 2765;
+
+void ChassisSetEnabled(uint8_t enabled)
+{
+    chassis_enabled = enabled ? 1U : 0U;
+    if (!chassis_enabled)
+    {
+        if (motor_lf != NULL) DJIMotorStop(motor_lf);
+        if (motor_rf != NULL) DJIMotorStop(motor_rf);
+        if (motor_lb != NULL) DJIMotorStop(motor_lb);
+        if (motor_rb != NULL) DJIMotorStop(motor_rb);
+    }
+}
+
+static float speed = 2765.0f;
 void ChassisSetRef(void)
 {
-    DJIMotorSetRef(motor_lf, speed);
-    DJIMotorSetRef(motor_rf, speed);
-    DJIMotorSetRef(motor_lb, speed);
-    DJIMotorSetRef(motor_rb, speed);
+    float reference = chassis_enabled ? speed : 0.0f;
+
+    if (motor_lf != NULL) DJIMotorSetRef(motor_lf, reference);
+    if (motor_rf != NULL) DJIMotorSetRef(motor_rf, reference);
+    if (motor_lb != NULL) DJIMotorSetRef(motor_lb, reference);
+    if (motor_rb != NULL) DJIMotorSetRef(motor_rb, reference);
 }

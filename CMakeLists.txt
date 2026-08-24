@@ -52,9 +52,12 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     application/chassis.c
+    application/gimbal.c
+    application/robot_cmd.c
     moudules/controller.c
     moudules/daemon.c
     moudules/dji_motor.c
+    moudules/remote_control.c
     moudules/user_lib.c
     bsp/bsp_tools.c
     bsp/can/bsp_can.c

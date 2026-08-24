@@ -20,6 +20,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32f1xx_it.h"
+#include "remote_control.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 /* USER CODE END Includes */
@@ -200,6 +201,22 @@ void TIM1_UP_IRQHandler(void)
   /* USER CODE BEGIN TIM1_UP_IRQn 1 */
 
   /* USER CODE END TIM1_UP_IRQn 1 */
+}
+
+void USART1_IRQHandler(void)
+{
+  uint32_t status = USART1->SR;
+
+  if ((status & USART_SR_RXNE) != 0U)
+  {
+    RemoteControlRxByte((uint8_t)USART1->DR);
+  }
+
+  if ((status & USART_SR_IDLE) != 0U)
+  {
+    (void)USART1->DR;
+    RemoteControlRxIdle();
+  }
 }
 
 /* USER CODE BEGIN 1 */

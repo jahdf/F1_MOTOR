@@ -29,6 +29,8 @@
 #include "chassis.h"
 #include "dji_motor.h"
 #include "daemon.h"
+#include "gimbal.h"
+#include "robot_cmd.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -71,6 +73,13 @@ const osThreadAttr_t DaemonTask_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityBelowNormal,
 };
+/* Definitions for RobotCmdTask */
+osThreadId_t RobotCmdTaskHandle;
+const osThreadAttr_t RobotCmdTask_attributes = {
+  .name = "RobotCmdTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -80,6 +89,7 @@ const osThreadAttr_t DaemonTask_attributes = {
 void StartDefaultTask(void *argument);
 void StartMotorTask(void *argument);
 void StartDaemonTask(void *argument);
+void StartRobotCmdTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -118,6 +128,9 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of DaemonTask */
   DaemonTaskHandle = osThreadNew(StartDaemonTask, NULL, &DaemonTask_attributes);
+
+  /* creation of RobotCmdTask */
+  RobotCmdTaskHandle = osThreadNew(StartRobotCmdTask, NULL, &RobotCmdTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -158,16 +171,29 @@ void StartMotorTask(void *argument)
 {
   /* USER CODE BEGIN StartMotorTask */
   DWT_Init(72);
-  ChassisInit();
+  ChassisInit(M3508);
+  GimbalInit();
 
   /* Infinite loop */
   for(;;)
   {
     ChassisSetRef();
+    GimbalTask();
     DJIMotorControl();
     osDelay(1);
   }
   /* USER CODE END StartMotorTask */
+}
+
+void StartRobotCmdTask(void *argument)
+{
+  RobotCmdInit();
+
+  for(;;)
+  {
+    RobotCmdTask();
+    osDelay(5);
+  }
 }
 
 /* USER CODE BEGIN Header_StartDaemonTask */

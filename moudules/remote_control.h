@@ -17,8 +17,8 @@
 #define RC_IBUS_CHANNEL_COUNT 10U
 
 #define RC_SW_UP ((uint16_t)1U)
-#define RC_SW_MID ((uint16_t)2U)
-#define RC_SW_DOWN ((uint16_t)3U)
+#define RC_SW_MID ((uint16_t)3U)
+#define RC_SW_DOWN ((uint16_t)2U)
 
 #define switch_is_down(value) ((value) == RC_SW_DOWN)
 #define switch_is_mid(value) ((value) == RC_SW_MID)

@@ -17,8 +17,8 @@
 #define RC_IBUS_CHANNEL_COUNT 10U
 
 #define RC_SW_UP ((uint16_t)1U)
-#define RC_SW_MID ((uint16_t)3U)
-#define RC_SW_DOWN ((uint16_t)2U)
+#define RC_SW_MID ((uint16_t)2U)
+#define RC_SW_DOWN ((uint16_t)3U)
 
 #define switch_is_down(value) ((value) == RC_SW_DOWN)
 #define switch_is_mid(value) ((value) == RC_SW_MID)
@@ -59,12 +59,12 @@ typedef struct
         int16_t dial;
         uint16_t knob_chassis;
         uint16_t knob_gimbal;
-        uint8_t switch_left;
-        uint8_t switch_right;
+      //  uint8_t switch_left;
+      //  uint8_t switch_right;
         uint8_t switch_enable;
-        uint8_t switch_chassis_speed;
-        uint8_t switch_gimbal_speed;
-        uint8_t switch_aux;
+        uint8_t switch_chassis_mode;
+      //  uint8_t switch_gimbal_speed;
+     //   uint8_t switch_aux;
     } rc;
     struct
     {

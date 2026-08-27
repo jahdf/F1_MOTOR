@@ -41,7 +41,7 @@ static void SetMotorEnabled(uint8_t enabled)
         LOGINFO("[robot_cmd] Motors disabled");
     }
 }
-
+//遥控离线暂停
 static uint8_t RemoteInputIsValid(void)
 {
     if (!RemoteControlIsOnline())
@@ -56,7 +56,7 @@ static uint8_t RemoteInputIsValid(void)
 
     return RemoteControlFrameValid();
 }
-
+//旋钮控制云台速度
 static float KnobToGimbalSpeed(uint16_t knob)
 {
     if (knob < RC_CH_VALUE_MIN) knob = RC_CH_VALUE_MIN;
@@ -65,7 +65,7 @@ static float KnobToGimbalSpeed(uint16_t knob)
            (float)(knob - RC_CH_VALUE_MIN) /
            (float)(RC_CH_VALUE_MAX - RC_CH_VALUE_MIN);
 }
-
+//旋钮控制底盘速度
 static float KnobToChassisSpeed(uint16_t knob)
 {
     if (knob <= CHASSIS_KNOB_ZERO_MAX)
@@ -77,7 +77,7 @@ static float KnobToChassisSpeed(uint16_t knob)
            (float)(knob - CHASSIS_KNOB_ZERO_MAX) /
            (float)(RC_CH_VALUE_MAX - CHASSIS_KNOB_ZERO_MAX);
 }
-
+//摇杆控制底盘
 static float StickToChassisSpeed(int16_t stick)
 {
     if (stick >= -ARM_STICK_DEADBAND && stick <= ARM_STICK_DEADBAND)
@@ -123,7 +123,7 @@ void RobotCmdTask(void)
         return;
     }
 
-    /* SwC upper/middle are safe states; lower is the only enable request. */
+
     if (!switch_is_down(remote_data->rc.switch_enable))
     {
         SetMotorEnabled(0U);
@@ -149,16 +149,17 @@ void RobotCmdTask(void)
     float chassis_cmd_vy = 0.0f;
     chassis_cmd_msg.control_mode = CHASSIS_MODE_STOP;
 
-    if (switch_is_down(remote_data->rc.switch_chassis_speed))
+    if (switch_is_down(remote_data->rc.switch_chassis_mode))
     {
         chassis_cmd_msg.control_mode = CHASSIS_MODE_JOYSTICK;
         chassis_cmd_vx = StickToChassisSpeed(remote_data->rc.rocker_r1);
         chassis_cmd_vy = StickToChassisSpeed(remote_data->rc.rocker_r_);
     }
-    else if (switch_is_up(remote_data->rc.switch_chassis_speed))
+    else if (switch_is_up(remote_data->rc.switch_chassis_mode))
     {
         chassis_cmd_msg.control_mode = CHASSIS_MODE_ODOMETRY;
         chassis_cmd_vx = KnobToChassisSpeed(remote_data->rc.knob_chassis);
+        chassis_cmd_vy = 0;
     }
 
     gimbal_cmd_wz = KnobToGimbalSpeed(remote_data->rc.knob_gimbal);

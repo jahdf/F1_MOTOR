@@ -12,9 +12,9 @@
 #include "bsp_log.h"
 #include <math.h>
 
-#define CHASSIS_WHEEL_RADIUS_M 0.08f//轮半径
+#define CHASSIS_WHEEL_RADIUS_M 0.0765f//轮半径
 #define CHASSIS_REDUCTION_RATIO 19.0f//减速比
-#define CHASSIS_ODOMETRY_LEG_M 5.0f//运行距离
+#define CHASSIS_ODOMETRY_LEG_M 2.0f//运行距离
 
 static DJIMotorInstance *motor_lf, *motor_rf;
 static uint8_t chassis_enabled;

@@ -238,6 +238,7 @@ void DJIMotorChangeFeed(DJIMotorInstance *motor, Closeloop_Type_e loop, Feedback
 }
 
 void DJIMotorStop(DJIMotorInstance *motor) {
+    motor->motor_controller.pid_ref = 0.0f;
     motor->stop_flag = MOTOR_STOP;
 }
 

@@ -58,6 +58,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     moudules/daemon.c
     moudules/dji_motor.c
     moudules/remote_control.c
+    moudules/message_center/message_center.c
     moudules/user_lib.c
     bsp/bsp_tools.c
     bsp/can/bsp_can.c
@@ -71,6 +72,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     application
     moudules
+    moudules/message_center
     bsp
     bsp/can
     bsp/dwt

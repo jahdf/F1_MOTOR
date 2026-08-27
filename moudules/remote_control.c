@@ -1,9 +1,12 @@
 #include "remote_control.h"
 
 #include "main.h"
+#include "usart.h"
+#include "bsp_log.h"
 #include "string.h"
 
-#define REMOTE_CONTROL_FRAME_SIZE 18U
+#define REMOTE_CONTROL_FRAME_SIZE 32U
+#define REMOTE_CONTROL_CHANNEL_COUNT RC_IBUS_CHANNEL_COUNT
 #define REMOTE_CONTROL_TIMEOUT_MS 100U
 
 static RC_ctrl_t rc_data[2];
@@ -12,59 +15,46 @@ static uint8_t rc_frame_index;
 static uint8_t rc_initialized;
 static uint32_t rc_last_frame_tick;
 
-static uint16_t DecodeChannel0(const uint8_t *frame)
+static uint8_t rc_rx_byte;
+static uint8_t rc_frame_state;
+static uint8_t rc_frame_valid;
+
+static uint16_t DecodeIbusChannel(const uint8_t *frame, uint8_t channel)
 {
-    return (uint16_t)((frame[0] | (frame[1] << 8U)) & 0x07FFU);
+    uint8_t offset = (uint8_t)(2U + channel * 2U);
+    return (uint16_t)(frame[offset] | ((uint16_t)frame[offset + 1U] << 8U));
 }
 
-static uint16_t DecodeChannel1(const uint8_t *frame)
+static uint8_t DecodeSwitch(uint16_t value)
 {
-    return (uint16_t)(((frame[1] >> 3U) | (frame[2] << 5U)) & 0x07FFU);
+    if (value < 1300U) return RC_SW_UP;
+    if (value > 1700U) return RC_SW_DOWN;
+    return RC_SW_MID;
 }
 
-static uint16_t DecodeChannel2(const uint8_t *frame)
+static uint8_t IbusFrameValid(const uint8_t *frame)
 {
-    return (uint16_t)(((frame[2] >> 6U) | (frame[3] << 2U) |
-                       (frame[4] << 10U)) & 0x07FFU);
-}
+    uint16_t checksum = 0xffffU;
+    uint16_t received;
 
-static uint16_t DecodeChannel3(const uint8_t *frame)
-{
-    return (uint16_t)(((frame[4] >> 1U) | (frame[5] << 7U)) & 0x07FFU);
-}
-
-static uint16_t DecodeDial(const uint8_t *frame)
-{
-    return (uint16_t)((frame[16] | (frame[17] << 8U)) & 0x07FFU);
+    if (frame[0] != 0x20U || frame[1] != 0x40U) return 0U;
+    for (uint8_t i = 0U; i < 30U; i++) checksum = (uint16_t)(checksum - frame[i]);
+    received = (uint16_t)(frame[30] | ((uint16_t)frame[31] << 8U));
+    return (uint8_t)(checksum == received);
 }
 
 static uint8_t FrameLooksValid(const uint8_t *frame)
 {
-    uint16_t channels[5];
-    uint8_t switch_right;
-    uint8_t switch_left;
-
-    channels[0] = DecodeChannel0(frame);
-    channels[1] = DecodeChannel1(frame);
-    channels[2] = DecodeChannel2(frame);
-    channels[3] = DecodeChannel3(frame);
-    channels[4] = DecodeDial(frame);
-    switch_right = (uint8_t)((frame[5] >> 4U) & 0x03U);
-    switch_left = (uint8_t)((frame[5] >> 4U) & 0x0CU) >> 2U;
-
-    for (uint8_t channel_index = 0U; channel_index < 5U; channel_index++)
+    if (!IbusFrameValid(frame)) return 0U;
+    for (uint8_t channel_index = 0U; channel_index < REMOTE_CONTROL_CHANNEL_COUNT; channel_index++)
     {
-        if (channels[channel_index] < RC_CH_VALUE_MIN ||
-            channels[channel_index] > RC_CH_VALUE_MAX)
+        uint16_t value = DecodeIbusChannel(frame, channel_index);
+        if (value < 800U || value > 2200U)
         {
             return 0U;
         }
     }
-
-    return ((switch_is_up(switch_right) || switch_is_mid(switch_right) ||
-             switch_is_down(switch_right)) &&
-            (switch_is_up(switch_left) || switch_is_mid(switch_left) ||
-             switch_is_down(switch_left)));
+    return 1U;
 }
 
 static void RectifyJoysticks(RC_ctrl_t *decoded)
@@ -91,19 +81,21 @@ static void DecodeFrame(const uint8_t *frame)
     uint16_t key_last_with_shift;
 
     memcpy(&decoded, &rc_data[TEMP], sizeof(decoded));
-    decoded.rc.rocker_r_ = (int16_t)DecodeChannel0(frame) - RC_CH_VALUE_OFFSET;
-    decoded.rc.rocker_r1 = (int16_t)DecodeChannel1(frame) - RC_CH_VALUE_OFFSET;
-    decoded.rc.rocker_l_ = (int16_t)DecodeChannel2(frame) - RC_CH_VALUE_OFFSET;
-    decoded.rc.rocker_l1 = (int16_t)DecodeChannel3(frame) - RC_CH_VALUE_OFFSET;
-    decoded.rc.dial = (int16_t)DecodeDial(frame) - RC_CH_VALUE_OFFSET;
-    decoded.rc.switch_right = (uint8_t)((frame[5] >> 4U) & 0x03U);
-    decoded.rc.switch_left = (uint8_t)(((frame[5] >> 4U) & 0x0CU) >> 2U);
-    decoded.mouse.x = (int16_t)(frame[6] | (frame[7] << 8U));
-    decoded.mouse.y = (int16_t)(frame[8] | (frame[9] << 8U));
-    decoded.mouse.z = (int16_t)(frame[10] | (frame[11] << 8U));
-    decoded.mouse.press_l = frame[12];
-    decoded.mouse.press_r = frame[13];
-    decoded.key[KEY_PRESS].keys = (uint16_t)(frame[14] | (frame[15] << 8U));
+    decoded.rc.rocker_r_ = (int16_t)DecodeIbusChannel(frame, 0U) - RC_CH_VALUE_OFFSET;
+    decoded.rc.rocker_r1 = (int16_t)DecodeIbusChannel(frame, 1U) - RC_CH_VALUE_OFFSET;
+    decoded.rc.rocker_l_ = (int16_t)DecodeIbusChannel(frame, 2U) - RC_CH_VALUE_OFFSET;
+    decoded.rc.rocker_l1 = (int16_t)DecodeIbusChannel(frame, 3U) - RC_CH_VALUE_OFFSET;
+    decoded.rc.knob_chassis = DecodeIbusChannel(frame, 4U);
+    decoded.rc.knob_gimbal = DecodeIbusChannel(frame, 5U);
+    decoded.rc.dial = (int16_t)decoded.rc.knob_chassis - RC_CH_VALUE_OFFSET;
+    decoded.rc.switch_chassis_speed = DecodeSwitch(DecodeIbusChannel(frame, 6U));
+    decoded.rc.switch_gimbal_speed = DecodeSwitch(DecodeIbusChannel(frame, 7U));
+    decoded.rc.switch_enable = DecodeSwitch(DecodeIbusChannel(frame, 8U));
+    decoded.rc.switch_aux = DecodeSwitch(DecodeIbusChannel(frame, 9U));
+    decoded.rc.switch_left = decoded.rc.switch_enable;
+    decoded.rc.switch_right = decoded.rc.switch_chassis_speed;
+    memset(&decoded.mouse, 0, sizeof(decoded.mouse));
+    memset(&decoded.key, 0, sizeof(decoded.key));
 
     if (decoded.key[KEY_PRESS].ctrl)
     {
@@ -164,26 +156,51 @@ void RemoteControlInit(void)
     rc_frame_index = 0U;
     rc_last_frame_tick = 0U;
     rc_initialized = 1U;
+    rc_frame_state = 0U;
+    rc_frame_valid = 0U;
+    LOGINFO("[remote] i-BUS initialized: USART1, 115200 8N1, 10 channels");
+}
+
+void RemoteControlStartReceive(void)
+{
+    rc_frame_state = 0U;
+    HAL_UART_Receive_IT(&huart1, &rc_rx_byte, 1U);
 }
 
 void RemoteControlRxByte(uint8_t byte)
 {
-    if (rc_frame_index < REMOTE_CONTROL_FRAME_SIZE)
+    if (rc_frame_state == 0U)
     {
-        rc_frame[rc_frame_index++] = byte;
+        if (byte != 0x20U) return;
+        rc_frame[0] = byte;
+        rc_frame_index = 1U;
+        rc_frame_state = 1U;
+        return;
     }
 
+    if (rc_frame_index < REMOTE_CONTROL_FRAME_SIZE) rc_frame[rc_frame_index++] = byte;
     if (rc_frame_index == REMOTE_CONTROL_FRAME_SIZE)
     {
         if (FrameLooksValid(rc_frame))
         {
             DecodeFrame(rc_frame);
-            rc_frame_index = 0U;
+            rc_frame_valid = 1U;
         }
         else
         {
-            rc_frame_index = 0U;
+            rc_frame_valid = 0U;
         }
+        rc_frame_index = 0U;
+        rc_frame_state = 0U;
+    }
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART1)
+    {
+        RemoteControlRxByte(rc_rx_byte);
+        HAL_UART_Receive_IT(&huart1, &rc_rx_byte, 1U);
     }
 }
 
@@ -200,6 +217,12 @@ const RC_ctrl_t *RemoteControlGetData(void)
 uint8_t RemoteControlIsOnline(void)
 {
     return (uint8_t)(rc_initialized &&
+                     rc_frame_valid &&
                      ((HAL_GetTick() - rc_last_frame_tick) <=
                       REMOTE_CONTROL_TIMEOUT_MS));
+}
+
+uint8_t RemoteControlFrameValid(void)
+{
+    return rc_frame_valid;
 }

@@ -20,11 +20,12 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "can.h"
-#include "gpio.h"
 #include "usart.h"
+#include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "bsp_log.h"
 
 /* USER CODE END Includes */
 
@@ -93,6 +94,8 @@ int main(void)
   MX_CAN_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+  BSPLogInit();
+  LOGINFO("[main] GPIO, CAN and USART1 initialized");
 
   /* USER CODE END 2 */
 

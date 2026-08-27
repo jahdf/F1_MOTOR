@@ -2,11 +2,16 @@
 
 #include "can.h"
 #include "dji_motor.h"
+#include "general_def.h"
 #include "motor_def.h"
+#include "message_center.h"
+#include "bsp_log.h"
 
 static DJIMotorInstance *gimbal_motor;
 static float gimbal_reference;
 static uint8_t gimbal_enabled;
+static Subscriber_t *gimbal_cmd_sub;
+static Gimbal_Cmd_t gimbal_cmd;
 
 void GimbalInit(void)
 {
@@ -43,11 +48,14 @@ void GimbalInit(void)
             .motor_reverse_flag = MOTOR_DIRECTION_NORMAL,
             .power_limit_flag = POWER_LIMIT_ON,
         },
-        .motor_type = M3508,
+        .motor_type = GM6020,
         .motor_control_type = CURRENT_CONTROL,
     };
 
     gimbal_motor = DJIMotorInit(&config);
+    gimbal_cmd_sub = SubRegister("gimbal_cmd", sizeof(Gimbal_Cmd_t));
+    gimbal_cmd.wz_rad_s = 0.0f;
+    gimbal_cmd.enabled = 0U;
     gimbal_reference = 0.0f;
     gimbal_enabled = 0U;
     if (gimbal_motor != NULL)
@@ -55,9 +63,17 @@ void GimbalInit(void)
         DJIMotorSetRef(gimbal_motor, 0.0f);
         DJIMotorStop(gimbal_motor);
     }
+    if (gimbal_motor != NULL && gimbal_cmd_sub != NULL)
+    {
+        LOGINFO("[gimbal] Initialized: GM6020 ID 5, motor disabled");
+    }
+    else
+    {
+        LOGERROR("[gimbal] Initialization failed");
+    }
 }
 
-void GimbalSetReference(float speed_ref)
+void GimbalSetRef(float speed_ref)
 {
     gimbal_reference = speed_ref;
 }
@@ -75,6 +91,12 @@ void GimbalSetEnabled(uint8_t enabled)
 
 void GimbalTask(void)
 {
+    if (gimbal_cmd_sub != NULL)
+    {
+        (void)SubGetMessage(gimbal_cmd_sub, &gimbal_cmd);
+        gimbal_reference = gimbal_cmd.wz_rad_s;
+        gimbal_enabled = gimbal_cmd.enabled;
+    }
     if (gimbal_motor == NULL)
     {
         return;
@@ -83,7 +105,7 @@ void GimbalTask(void)
     if (gimbal_enabled)
     {
         DJIMotorEnable(gimbal_motor);
-        DJIMotorSetRef(gimbal_motor, gimbal_reference);
+        DJIMotorSetRef(gimbal_motor, gimbal_reference * RAD_2_DEGREE);
     }
     else
     {

@@ -8,8 +8,24 @@
 #include "bsp_can.h"
 #include "motor_def.h"
 
-void ChassisInit(Motor_Type_e motor_type);
-void ChassisSetRef(void);
+typedef enum
+{
+    CHASSIS_MODE_STOP = 0,
+    CHASSIS_MODE_JOYSTICK,
+    CHASSIS_MODE_ODOMETRY,
+} Chassis_Control_Mode_e;
+
+typedef struct
+{
+    float vx_mps;
+    float vy_mps;
+    uint8_t enabled;
+    Chassis_Control_Mode_e control_mode;
+} Chassis_Cmd_t;
+
+void ChassisInit();
+void ChassisSetRef(float chassis_cmd_vx);
 void ChassisSetEnabled(uint8_t enabled);
+void ChassisTask(void);
 
 #endif //TEXT1_CHASSIS_H

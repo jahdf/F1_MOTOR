@@ -30,6 +30,7 @@
 #include "dji_motor.h"
 #include "daemon.h"
 #include "gimbal.h"
+#include "remote_control.h"
 #include "robot_cmd.h"
 /* USER CODE END Includes */
 
@@ -171,29 +172,18 @@ void StartMotorTask(void *argument)
 {
   /* USER CODE BEGIN StartMotorTask */
   DWT_Init(72);
-  ChassisInit(M3508);
+  ChassisInit();
   GimbalInit();
 
   /* Infinite loop */
   for(;;)
   {
-    ChassisSetRef();
+    ChassisTask();
     GimbalTask();
     DJIMotorControl();
     osDelay(1);
   }
   /* USER CODE END StartMotorTask */
-}
-
-void StartRobotCmdTask(void *argument)
-{
-  RobotCmdInit();
-
-  for(;;)
-  {
-    RobotCmdTask();
-    osDelay(5);
-  }
 }
 
 /* USER CODE BEGIN Header_StartDaemonTask */
@@ -213,6 +203,27 @@ void StartDaemonTask(void *argument)
     osDelay(5);
   }
   /* USER CODE END StartDaemonTask */
+}
+
+/* USER CODE BEGIN Header_StartRobotCmdTask */
+/**
+* @brief Function implementing the RobotCmdTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartRobotCmdTask */
+void StartRobotCmdTask(void *argument)
+{
+  /* USER CODE BEGIN StartRobotCmdTask */
+  RobotCmdInit();
+  RemoteControlStartReceive();
+  /* Infinite loop */
+  for(;;)
+  {
+    RobotCmdTask();
+    osDelay(1);
+  }
+  /* USER CODE END StartRobotCmdTask */
 }
 
 /* Private application code --------------------------------------------------*/

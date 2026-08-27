@@ -11,9 +11,10 @@
 #define KEY_PRESS_WITH_CTRL 1U
 #define KEY_PRESS_WITH_SHIFT 2U
 
-#define RC_CH_VALUE_MIN ((uint16_t)364U)
-#define RC_CH_VALUE_OFFSET ((uint16_t)1024U)
-#define RC_CH_VALUE_MAX ((uint16_t)1684U)
+#define RC_CH_VALUE_MIN ((uint16_t)1000U)
+#define RC_CH_VALUE_OFFSET ((uint16_t)1500U)
+#define RC_CH_VALUE_MAX ((uint16_t)2000U)
+#define RC_IBUS_CHANNEL_COUNT 10U
 
 #define RC_SW_UP ((uint16_t)1U)
 #define RC_SW_MID ((uint16_t)3U)
@@ -56,8 +57,14 @@ typedef struct
         int16_t rocker_r_;
         int16_t rocker_r1;
         int16_t dial;
+        uint16_t knob_chassis;
+        uint16_t knob_gimbal;
         uint8_t switch_left;
         uint8_t switch_right;
+        uint8_t switch_enable;
+        uint8_t switch_chassis_speed;
+        uint8_t switch_gimbal_speed;
+        uint8_t switch_aux;
     } rc;
     struct
     {
@@ -74,7 +81,9 @@ typedef struct
 void RemoteControlInit(void);
 void RemoteControlRxByte(uint8_t byte);
 void RemoteControlRxIdle(void);
+void RemoteControlStartReceive(void);
 const RC_ctrl_t *RemoteControlGetData(void);
 uint8_t RemoteControlIsOnline(void);
+uint8_t RemoteControlFrameValid(void);
 
 #endif

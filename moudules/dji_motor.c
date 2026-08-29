@@ -166,7 +166,8 @@ static void DecodeDJIMotor(CANInstance *_instance) {
     measure->real_current = (1.0f - CURRENT_SMOOTH_COEF) * measure->real_current +
                             CURRENT_SMOOTH_COEF * (float) ((int16_t) (rxbuff[4] << 8 | rxbuff[5]));
     measure->temperature = rxbuff[6];
-
+    measure->speed_ms =measure->speed_aps * DEGREE_2_RAD / 19 * 0.0765f;
+    measure->speed_rad = measure->speed_aps * DEGREE_2_RAD;
     // 多圈角度计算,前提是假设两次采样间电机转过的角度小于180°,自己画个图就清楚计算过程了
     if (measure->ecd - measure->last_ecd > 4096)
         measure->total_round--;

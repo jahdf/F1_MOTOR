@@ -46,13 +46,6 @@ static float ChassisLinearToMotorSpeed(float speed_mps)
 {
     return speed_mps / CHASSIS_WHEEL_RADIUS_M * CHASSIS_REDUCTION_RATIO * RAD_2_DEGREE;
 }
-//电机反转后编码器的值也要反一下
-static float ChassisMotorSpeedToLinearSpeed(float motor_speed_aps, uint8_t reverse)
-{
-    if (reverse) motor_speed_aps = -motor_speed_aps;
-    return motor_speed_aps * DEGREE_2_RAD / CHASSIS_REDUCTION_RATIO * CHASSIS_WHEEL_RADIUS_M;
-}
-
 static float ChassisMotorAngleToDistance(float motor_angle_deg)
 {
     return motor_angle_deg * DEGREE_2_RAD /
@@ -290,15 +283,13 @@ void ChassisTask(void)
                                                    CHASSIS_SAME_DIRECTION_ACCEL,
                                                    CHASSIS_REVERSE_ACCEL, 1.0f,
                                                    left_target_speed,
-                                                   ChassisMotorSpeedToLinearSpeed(
-                                                       motor_lf->measure.speed_aps, 0U),
+                                                   motor_lf->measure.speed_ms,
                                                    CHASSIS_TASK_DT_S);
     float right_planned_speed = SlopePlanner_Update(&right_speed_planner,
                                                     CHASSIS_SAME_DIRECTION_ACCEL,
                                                     CHASSIS_REVERSE_ACCEL, 1.0f,
                                                     right_target_speed,
-                                                    ChassisMotorSpeedToLinearSpeed(
-                                                        motor_rf->measure.speed_aps, 1U),
+                                                    -motor_rf->measure.speed_ms,
                                                     CHASSIS_TASK_DT_S);
     DJIMotorSetRef(motor_lf, ChassisLinearToMotorSpeed(left_planned_speed));
     DJIMotorSetRef(motor_rf, ChassisLinearToMotorSpeed(right_planned_speed));

@@ -10,11 +10,16 @@
 #include "motor_def.h"
 #include "message_center.h"
 #include "bsp_log.h"
+#include "slope_planner.h"
 #include <math.h>
 
 #define CHASSIS_WHEEL_RADIUS_M 0.0765f//轮半径
 #define CHASSIS_REDUCTION_RATIO 19.0f//减速比
 #define CHASSIS_ODOMETRY_LEG_M 2.0f//运行距离
+#define CHASSIS_TASK_DT_S 0.001f
+/* Planner units are wheel linear speed (m/s). */
+#define CHASSIS_SAME_DIRECTION_ACCEL 4.0f
+#define CHASSIS_REVERSE_ACCEL 6.0f
 
 static DJIMotorInstance *motor_lf, *motor_rf;
 static uint8_t chassis_enabled;
@@ -26,11 +31,26 @@ static uint8_t odometry_initialized;
 static int8_t odometry_direction;
 static float odometry_start_l_deg;
 static float odometry_start_r_deg;
+static SlopePlanner_t left_speed_planner;
+static SlopePlanner_t right_speed_planner;
+
+static void ChassisResetSpeedPlanners(void)
+{
+    SlopePlanner_Init(&left_speed_planner);
+    SlopePlanner_Init(&right_speed_planner);
+}
+
 
 //单位换算
 static float ChassisLinearToMotorSpeed(float speed_mps)
 {
     return speed_mps / CHASSIS_WHEEL_RADIUS_M * CHASSIS_REDUCTION_RATIO * RAD_2_DEGREE;
+}
+//电机反转后编码器的值也要反一下
+static float ChassisMotorSpeedToLinearSpeed(float motor_speed_aps, uint8_t reverse)
+{
+    if (reverse) motor_speed_aps = -motor_speed_aps;
+    return motor_speed_aps * DEGREE_2_RAD / CHASSIS_REDUCTION_RATIO * CHASSIS_WHEEL_RADIUS_M;
 }
 
 static float ChassisMotorAngleToDistance(float motor_angle_deg)
@@ -45,13 +65,13 @@ static uint8_t ChassisMotorFeedbackValid(void)
                      motor_lf->dt > 0.0f && motor_rf->dt > 0.0f &&
                      motor_lf->lost_flag == 0U && motor_rf->lost_flag == 0U);
 }
-
+//设置底盘模式
 static void ChassisResetOdometry(void)
 {
     odometry_initialized = 0U;
     odometry_direction = 1;
 }
-
+//设置循环长度
 static float ChassisOdometrySpeedRef(float speed_mps)
 {
     if (!odometry_initialized)
@@ -120,7 +140,7 @@ void ChassisInit() {
         .can_init_config.can_handle = &hcan,
         .controller_param_init_config = {
             .speed_PID = {
-                .Kp = 0.0f,
+                .Kp = 1.0f,
                 .Ki = 0.0f,
                 .Kd = 0.0f,
                 .IntegralLimit = 3000,
@@ -147,11 +167,11 @@ void ChassisInit() {
 .motor_control_type =  CURRENT_CONTROL
 };
     //右前
-    chassis_motor_config.can_init_config.tx_id = 1;
-    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
+    chassis_motor_config.can_init_config.tx_id = 2;
+    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
     motor_rf = DJIMotorInit(&chassis_motor_config);
     //左前
-    chassis_motor_config.can_init_config.tx_id = 2;
+    chassis_motor_config.can_init_config.tx_id = 1;
     chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
     motor_lf = DJIMotorInit(&chassis_motor_config);
 
@@ -163,6 +183,7 @@ void ChassisInit() {
     active_control_mode = CHASSIS_MODE_STOP;
     chassis_feedback_blocked = 0U;
     ChassisResetOdometry();
+    ChassisResetSpeedPlanners();
 
     ChassisSetEnabled(0U);
     if (motor_lf != NULL && motor_rf != NULL && chassis_cmd_sub != NULL)
@@ -190,6 +211,7 @@ void ChassisSetEnabled(uint8_t enabled)
         if (motor_rf != NULL) DJIMotorStop(motor_rf);
         chassis_feedback_blocked = 0U;
         ChassisResetOdometry();
+        ChassisResetSpeedPlanners();
     }
 }
 
@@ -213,13 +235,22 @@ void ChassisTask(void)
     if (motor_lf == NULL || motor_rf == NULL) return;
     if (!chassis_cmd.enabled || !chassis_enabled)
     {
-        DJIMotorSetRef(motor_lf, 0.0f);
-        DJIMotorSetRef(motor_rf, 0.0f);
+        float left_planned_speed = SlopePlanner_Update(&left_speed_planner,
+                                                       CHASSIS_SAME_DIRECTION_ACCEL,
+                                                       CHASSIS_REVERSE_ACCEL, 0.0f,
+                                                       0.0f, NAN, CHASSIS_TASK_DT_S);
+        float right_planned_speed = SlopePlanner_Update(&right_speed_planner,
+                                                        CHASSIS_SAME_DIRECTION_ACCEL,
+                                                        CHASSIS_REVERSE_ACCEL, 0.0f,
+                                                        0.0f, NAN, CHASSIS_TASK_DT_S);
+        DJIMotorSetRef(motor_lf, ChassisLinearToMotorSpeed(left_planned_speed));
+        DJIMotorSetRef(motor_rf, ChassisLinearToMotorSpeed(right_planned_speed));
         return;
     }
 
     if (!ChassisMotorFeedbackValid())
     {
+        ChassisResetSpeedPlanners();
         DJIMotorSetRef(motor_lf, 0.0f);
         DJIMotorSetRef(motor_rf, 0.0f);
         DJIMotorStop(motor_lf);
@@ -253,9 +284,22 @@ void ChassisTask(void)
         chassis_speed_vx = ChassisOdometrySpeedRef(chassis_cmd.vx_mps);
     }
 
-    /* Differential drive: vx is forward/backward and vy is the left/right turn command. */
-    float left_speed = ChassisLinearToMotorSpeed(chassis_speed_vx - chassis_speed_vy);
-    float right_speed = ChassisLinearToMotorSpeed(chassis_speed_vx + chassis_speed_vy);
-    DJIMotorSetRef(motor_lf, left_speed);
-    DJIMotorSetRef(motor_rf, right_speed);
+    float left_target_speed = chassis_speed_vx - chassis_speed_vy;
+    float right_target_speed = chassis_speed_vx + chassis_speed_vy;
+    float left_planned_speed = SlopePlanner_Update(&left_speed_planner,
+                                                   CHASSIS_SAME_DIRECTION_ACCEL,
+                                                   CHASSIS_REVERSE_ACCEL, 1.0f,
+                                                   left_target_speed,
+                                                   ChassisMotorSpeedToLinearSpeed(
+                                                       motor_lf->measure.speed_aps, 0U),
+                                                   CHASSIS_TASK_DT_S);
+    float right_planned_speed = SlopePlanner_Update(&right_speed_planner,
+                                                    CHASSIS_SAME_DIRECTION_ACCEL,
+                                                    CHASSIS_REVERSE_ACCEL, 1.0f,
+                                                    right_target_speed,
+                                                    ChassisMotorSpeedToLinearSpeed(
+                                                        motor_rf->measure.speed_aps, 1U),
+                                                    CHASSIS_TASK_DT_S);
+    DJIMotorSetRef(motor_lf, ChassisLinearToMotorSpeed(left_planned_speed));
+    DJIMotorSetRef(motor_rf, ChassisLinearToMotorSpeed(right_planned_speed));
 }

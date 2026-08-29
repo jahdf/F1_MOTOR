@@ -18,7 +18,7 @@ void GimbalInit(void)
     Motor_Init_Config_s config = {
         .can_init_config = {
             .can_handle = &hcan,
-            .tx_id = 5U,
+            .tx_id = 3U,
         },
         .controller_param_init_config = {
             .speed_PID = {

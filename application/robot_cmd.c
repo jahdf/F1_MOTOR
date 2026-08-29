@@ -7,10 +7,10 @@
 #include "bsp_log.h"
 
 #define RC_CHANNEL_SCALE (1.0f / 500.0f)
-#define CHASSIS_SPEED_MAX 5.0f
+#define CHASSIS_SPEED_MAX 2.0f
 #define CHASSIS_KNOB_ZERO_MAX 1050U
-#define GIMBAL_SPEED_MIN 1.0f
-#define GIMBAL_SPEED_MAX 5.0f
+#define GIMBAL_SPEED_MIN 0.0f
+#define GIMBAL_SPEED_MAX 2.0f
 #define ARM_STICK_DEADBAND 50
 
 static const RC_ctrl_t *remote_data;

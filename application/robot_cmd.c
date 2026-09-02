@@ -12,11 +12,11 @@
 #define CHASSIS_SPEED_MAX 2.0f
 #define CHASSIS_KNOB_ZERO_MAX 1050U
 #define GIMBAL_SPEED_MIN 0.0f
-#define GIMBAL_SPEED_MAX 2.0f
+#define GIMBAL_SPEED_MAX 15.0f
 #define GIMBAL_RANDOM_SPEED_MIN 1.0f
-#define GIMBAL_RANDOM_SPEED_MAX 5.0f
-#define GIMBAL_RANDOM_SPEED_MEAN 3.0f
-#define GIMBAL_RANDOM_SPEED_STDDEV 1.0f
+#define GIMBAL_RANDOM_SPEED_MAX 8.0f
+#define GIMBAL_RANDOM_SPEED_MEAN 5.0f
+#define GIMBAL_RANDOM_SPEED_STDDEV 2.0f //变化幅度
 #define ARM_STICK_DEADBAND 50
 
 static const RC_ctrl_t *remote_data;
@@ -52,7 +52,19 @@ static float GenerateGaussianNoise(void)
     has_spare = 1U;
     return u * s;
 }
-
+static float Slow_Gaussian_Noise(void)
+{
+    static float noise_out = 0;
+    static int cnt = 0;
+    const int skip = 20; // 每20次循环，才更新一次噪声
+    cnt++;
+    if(cnt >= skip)
+    {
+        noise_out =  GenerateGaussianNoise();
+        cnt = 0;
+    }
+    return noise_out;
+}
 static void SetMotorEnabled(uint8_t enabled)
 {
     uint8_t requested_state = enabled ? 1U : 0U;
@@ -104,10 +116,10 @@ static float GimbalSpeedFromSwitches(void)
     }
 
     if (switch_is_down(remote_data->rc.switch_gimbal_speed)) return 2.512f;
-    if (switch_is_mid(remote_data->rc.switch_gimbal_speed)) return 5.0f;
+    if (switch_is_mid(remote_data->rc.switch_gimbal_speed)) return 8.0f;
 
     float speed = GIMBAL_RANDOM_SPEED_MEAN +
-                  GIMBAL_RANDOM_SPEED_STDDEV * GenerateGaussianNoise();
+      GIMBAL_RANDOM_SPEED_STDDEV *  Slow_Gaussian_Noise();
     if (speed < GIMBAL_RANDOM_SPEED_MIN) speed = GIMBAL_RANDOM_SPEED_MIN;
     if (speed > GIMBAL_RANDOM_SPEED_MAX) speed = GIMBAL_RANDOM_SPEED_MAX;
     return speed;

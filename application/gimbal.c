@@ -18,12 +18,12 @@ void GimbalInit(void)
     Motor_Init_Config_s config = {
         .can_init_config = {
             .can_handle = &hcan,
-            .tx_id = 3U,
+            .tx_id = 7U,
         },
         .controller_param_init_config = {
             .speed_PID = {
-                .Kp = 1.0f,
-                .Ki = 0.0f,
+                .Kp = 40.0f,
+                .Ki = 5.0f,
                 .Kd = 0.001f,
                 .IntegralLimit = 3000,
                 .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit |

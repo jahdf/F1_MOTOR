@@ -16,10 +16,10 @@ typedef struct {
 static const Motor_Type_e motor_types[] = {GM6020, M3508};
 static const char *const motor_names[] = {"GM6020", "M3508"};
 static DisplayButton_s buttons[] = {
-    {KEY1_GPIO_Port, KEY1_Pin, GPIO_PIN_SET, 0U},
-    {KEY2_GPIO_Port, KEY2_Pin, GPIO_PIN_SET, 0U},
-    {KEY3_GPIO_Port, KEY3_Pin, GPIO_PIN_SET, 0U},
-    {KEY4_GPIO_Port, KEY4_Pin, GPIO_PIN_SET, 0U},
+    {C1_GPIO_Port, C1_Pin, GPIO_PIN_SET, 0U},
+    {C2_GPIO_Port, C2_Pin, GPIO_PIN_SET, 0U},
+    {C3_GPIO_Port, C3_Pin, GPIO_PIN_SET, 0U},
+    {C4_GPIO_Port, C4_Pin, GPIO_PIN_SET, 0U},
 };
 static uint8_t selected_index = 1U;
 static DisplayState_e state = DISPLAY_SELECT;
@@ -30,6 +30,7 @@ static volatile Motor_Type_e selected_type = M3508;
 
 static uint8_t ButtonPressed(DisplayButton_s *button)
 {
+    HAL_GPIO_WritePin(R1_GPIO_Port, R1_Pin, GPIO_PIN_RESET);
     GPIO_PinState raw = HAL_GPIO_ReadPin(button->port, button->pin);
     if (raw == button->state) {
         button->count = 0U;

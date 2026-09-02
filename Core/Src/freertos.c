@@ -72,12 +72,6 @@ const osThreadAttr_t DaemonTask_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityBelowNormal,
 };
-osThreadId_t DisplayTaskHandle;
-const osThreadAttr_t DisplayTask_attributes = {
-  .name = "DisplayTask",
-  .stack_size = 512 * 4,
-  .priority = (osPriority_t) osPriorityBelowNormal,
-};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -87,7 +81,6 @@ const osThreadAttr_t DisplayTask_attributes = {
 void StartDefaultTask(void *argument);
 void StartMotorTask(void *argument);
 void StartDaemonTask(void *argument);
-void StartDisplayTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -126,7 +119,6 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of DaemonTask */
   DaemonTaskHandle = osThreadNew(StartDaemonTask, NULL, &DaemonTask_attributes);
-  DisplayTaskHandle = osThreadNew(StartDisplayTask, NULL, &DisplayTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -200,11 +192,6 @@ void StartDaemonTask(void *argument)
     osDelay(5);
   }
   /* USER CODE END StartDaemonTask */
-}
-
-void StartDisplayTask(void *argument)
-{
-  DisplayAppTask(argument);
 }
 
 /* Private application code --------------------------------------------------*/

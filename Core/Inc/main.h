@@ -57,14 +57,16 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define KEY1_Pin GPIO_PIN_12
-#define KEY1_GPIO_Port GPIOB
-#define KEY2_Pin GPIO_PIN_13
-#define KEY2_GPIO_Port GPIOB
-#define KEY3_Pin GPIO_PIN_14
-#define KEY3_GPIO_Port GPIOB
-#define KEY4_Pin GPIO_PIN_15
-#define KEY4_GPIO_Port GPIOB
+#define C1_Pin GPIO_PIN_12
+#define C1_GPIO_Port GPIOB
+#define C2_Pin GPIO_PIN_13
+#define C2_GPIO_Port GPIOB
+#define C3_Pin GPIO_PIN_14
+#define C3_GPIO_Port GPIOB
+#define C4_Pin GPIO_PIN_15
+#define C4_GPIO_Port GPIOB
+#define R1_Pin GPIO_PIN_8
+#define R1_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
 

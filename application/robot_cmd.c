@@ -5,12 +5,18 @@
 #include "remote_control.h"
 #include "message_center.h"
 #include "bsp_log.h"
+#include <math.h>
+#include <stdlib.h>
 
 #define RC_CHANNEL_SCALE (1.0f / 500.0f)
 #define CHASSIS_SPEED_MAX 2.0f
 #define CHASSIS_KNOB_ZERO_MAX 1050U
 #define GIMBAL_SPEED_MIN 0.0f
 #define GIMBAL_SPEED_MAX 2.0f
+#define GIMBAL_RANDOM_SPEED_MIN 1.0f
+#define GIMBAL_RANDOM_SPEED_MAX 5.0f
+#define GIMBAL_RANDOM_SPEED_MEAN 3.0f
+#define GIMBAL_RANDOM_SPEED_STDDEV 1.0f
 #define ARM_STICK_DEADBAND 50
 
 static const RC_ctrl_t *remote_data;
@@ -22,6 +28,30 @@ static Publisher_t *chassis_cmd_pub;
 static Publisher_t *gimbal_cmd_pub;
 static Chassis_Cmd_t chassis_cmd_msg;
 static Gimbal_Cmd_t gimbal_cmd_msg;
+
+static float GenerateGaussianNoise(void)
+{
+    static uint8_t has_spare;
+    static float spare;
+    if (has_spare)
+    {
+        has_spare = 0U;
+        return spare;
+    }
+
+    float u, v, s;
+    do
+    {
+        u = ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f;
+        v = ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f;
+        s = u * u + v * v;
+    } while (s >= 1.0f || s == 0.0f);
+
+    s = sqrtf(-2.0f * logf(s) / s);
+    spare = v * s;
+    has_spare = 1U;
+    return u * s;
+}
 
 static void SetMotorEnabled(uint8_t enabled)
 {
@@ -64,6 +94,23 @@ static float KnobToGimbalSpeed(uint16_t knob)
     return GIMBAL_SPEED_MIN + (GIMBAL_SPEED_MAX - GIMBAL_SPEED_MIN) *
            (float)(knob - RC_CH_VALUE_MIN) /
            (float)(RC_CH_VALUE_MAX - RC_CH_VALUE_MIN);
+}
+//三档控制云台速度
+static float GimbalSpeedFromSwitches(void)
+{
+    if (!switch_is_down(remote_data->rc.switch_gimbal_speed_enable))
+    {
+        return KnobToGimbalSpeed(remote_data->rc.knob_gimbal);
+    }
+
+    if (switch_is_down(remote_data->rc.switch_gimbal_speed)) return 2.512f;
+    if (switch_is_mid(remote_data->rc.switch_gimbal_speed)) return 5.0f;
+
+    float speed = GIMBAL_RANDOM_SPEED_MEAN +
+                  GIMBAL_RANDOM_SPEED_STDDEV * GenerateGaussianNoise();
+    if (speed < GIMBAL_RANDOM_SPEED_MIN) speed = GIMBAL_RANDOM_SPEED_MIN;
+    if (speed > GIMBAL_RANDOM_SPEED_MAX) speed = GIMBAL_RANDOM_SPEED_MAX;
+    return speed;
 }
 //旋钮控制底盘速度
 static float KnobToChassisSpeed(uint16_t knob)
@@ -162,7 +209,7 @@ void RobotCmdTask(void)
         chassis_cmd_vy = 0;
     }
 
-    gimbal_cmd_wz = KnobToGimbalSpeed(remote_data->rc.knob_gimbal);
+    gimbal_cmd_wz = GimbalSpeedFromSwitches();
 
     chassis_cmd_msg.vx_mps = chassis_cmd_vx;
     chassis_cmd_msg.vy_mps = chassis_cmd_vy;

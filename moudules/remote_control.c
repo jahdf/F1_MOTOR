@@ -89,11 +89,9 @@ static void DecodeFrame(const uint8_t *frame)
     decoded.rc.knob_gimbal = DecodeIbusChannel(frame, 5U);
     decoded.rc.dial = (int16_t)decoded.rc.knob_chassis - RC_CH_VALUE_OFFSET;
     decoded.rc.switch_chassis_mode = DecodeSwitch(DecodeIbusChannel(frame, 6U));//通道SWA设置底盘模式
-    //decoded.rc.switch_gimbal_speed = DecodeSwitch(DecodeIbusChannel(frame, 7U));//通道SWB暂时无用
-    decoded.rc.switch_enable = DecodeSwitch(DecodeIbusChannel(frame, 8U));
-   // decoded.rc.switch_aux = DecodeSwitch(DecodeIbusChannel(frame, 9U));
-   // decoded.rc.switch_left = decoded.rc.switch_enable;
-   // decoded.rc.switch_right = decoded.rc.switch_chassis_mode;
+    decoded.rc.switch_enable = DecodeSwitch(DecodeIbusChannel(frame, 7U));// CH8, 两档使能
+    decoded.rc.switch_gimbal_speed = DecodeSwitch(DecodeIbusChannel(frame, 8U));// CH9, 云台速度档位
+    decoded.rc.switch_gimbal_speed_enable = DecodeSwitch(DecodeIbusChannel(frame, 9U));// CH10, CH9使能
     memset(&decoded.mouse, 0, sizeof(decoded.mouse));
     memset(&decoded.key, 0, sizeof(decoded.key));
 

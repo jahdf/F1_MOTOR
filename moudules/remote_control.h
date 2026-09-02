@@ -59,12 +59,10 @@ typedef struct
         int16_t dial;
         uint16_t knob_chassis;
         uint16_t knob_gimbal;
-      //  uint8_t switch_left;
-      //  uint8_t switch_right;
         uint8_t switch_enable;
         uint8_t switch_chassis_mode;
-      //  uint8_t switch_gimbal_speed;
-     //   uint8_t switch_aux;
+        uint8_t switch_gimbal_speed;
+        uint8_t switch_gimbal_speed_enable;
     } rc;
     struct
     {

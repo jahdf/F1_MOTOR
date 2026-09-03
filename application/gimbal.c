@@ -22,12 +22,13 @@ void GimbalInit(void)
         },
         .controller_param_init_config = {
             .speed_PID = {
-                .Kp = 40.0f,
-                .Ki = 5.0f,
+                .Kp = 22.0f,
+                .Ki = 0.5f,
                 .Kd = 0.001f,
-                .IntegralLimit = 3000,
+                .Kf = 0.0f,
+                .IntegralLimit = 300,
                 .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit |
-                           PID_Derivative_On_Measurement,
+                           PID_Derivative_On_Measurement |FF_Proportional,
                 .MaxOut = 30000,
             },
             .current_PID = {
@@ -84,6 +85,7 @@ void GimbalSetEnabled(uint8_t enabled)
     if (!gimbal_enabled && gimbal_motor != NULL)
     {
         gimbal_reference = 0.0f;
+        PIDReset(&gimbal_motor->motor_controller.speed_PID);
         DJIMotorSetRef(gimbal_motor, 0.0f);
         DJIMotorStop(gimbal_motor);
     }
@@ -110,6 +112,7 @@ void GimbalTask(void)
     else
     {
         DJIMotorSetRef(gimbal_motor, 0.0f);
+        PIDReset(&gimbal_motor->motor_controller.speed_PID);
         DJIMotorStop(gimbal_motor);
     }
 }

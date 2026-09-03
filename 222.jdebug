@@ -32,7 +32,6 @@ void OnProjectLoad (void) {
   //
   // User settings
   //
-  Edit.SysVar (VAR_HSS_SPEED, FREQ_500_HZ);
   File.Open ("$(ProjectDir)/cmake-build-debug/text1.elf");
 }
 

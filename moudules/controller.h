@@ -161,6 +161,12 @@ typedef struct // config parameter
 void PIDInit(PIDInstance *pid, PID_Init_Config_s *config);
 
 /**
+ * @brief 清空PID运行状态，保留Kp、Ki、Kd和限幅等配置参数
+ * @param pid PID实例
+ */
+void PIDReset(PIDInstance *pid);
+
+/**
  * @brief 计算PID输出
  *
  * @param pid     PID实例指针

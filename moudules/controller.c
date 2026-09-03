@@ -45,8 +45,7 @@ static void f_Integral_Limit(PIDInstance *pid) {
     } else if (temp_Iout < -pid->IntegralLimit) {
         pid->ITerm = -pid->IntegralLimit - pid->Iout;
     }
-    // 确保ITerm不会导致超限
-    pid->Iout += pid->ITerm;
+
 }
 
 // 微分先行(仅使用反馈值而不计参考输入的微分)
@@ -177,6 +176,31 @@ void PIDInit(PIDInstance *pid, PID_Init_Config_s *config) {
     pid->Last_Ref = 0; // 初始化为0或首次调用时更新
 }
 
+void PIDReset(PIDInstance *pid)
+{
+    if (pid == NULL) return;
+
+    pid->Measure = 0.0f;
+    pid->Last_Measure = 0.0f;
+    pid->Err = 0.0f;
+    pid->Last_Err = 0.0f;
+    pid->Last_ITerm = 0.0f;
+    pid->Pout = 0.0f;
+    pid->Iout = 0.0f;
+    pid->Dout = 0.0f;
+    pid->ITerm = 0.0f;
+    pid->Output = 0.0f;
+    pid->Last_Output = 0.0f;
+    pid->Last_Dout = 0.0f;
+    pid->Ref = 0.0f;
+    pid->Last_Ref = 0.0f;
+    pid->dt = 0.0f;
+    pid->is_initialized = 0;
+    pid->ERRORHandler.ERRORCount = 0U;
+    pid->ERRORHandler.ERRORType = PID_ERROR_NONE;
+    DWT_GetDeltaT(&pid->DWT_CNT);
+}
+
 /**
  * @brief          PID计算
  * @param[in]      PID结构体
@@ -271,6 +295,7 @@ PIDCalculate(PIDInstance *pid, float measure, float ref)
     {
         pid->Output = 0;
         pid->ITerm = 0;
+        pid->Iout = 0;
     }
 
     // 保存当前数据,用于下次计算

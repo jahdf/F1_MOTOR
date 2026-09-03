@@ -8,6 +8,8 @@
 #include <math.h>
 #include <stdlib.h>
 
+#include "general_def.h"
+
 #define RC_CHANNEL_SCALE (1.0f / 500.0f)
 #define CHASSIS_SPEED_MAX 2.0f
 #define CHASSIS_KNOB_ZERO_MAX 1050U
@@ -28,6 +30,20 @@ static Publisher_t *chassis_cmd_pub;
 static Publisher_t *gimbal_cmd_pub;
 static Chassis_Cmd_t chassis_cmd_msg;
 static Gimbal_Cmd_t gimbal_cmd_msg;
+
+// --- 全局或静态变量定义区 (放在函数外或设为 static) ---
+static float current_accel = 0.0f;               // 当前加速度
+static float rotate_speed = 2.0f * PI * 0.5f;    // 当前速度 (初始值)
+
+// --- OU 过程与控制参数 (需要根据你的底盘控制频率调参) ---
+const float OU_THETA = 2.0f;    // 回归强度: 越大，加速度越快衰减到0 (防震荡)
+const float OU_SIGMA = 10.0f;   // 随机强度: 决定加速度波动的剧烈程度
+const float CTRL_DT  = 0.001f;  // 控制周期 dt
+
+// --- 速度限制范围参数 ---
+const float BASE_SPEED = 12; // 基准速度
+const float MAX_SPEED  = BASE_SPEED + 3.0f; // 随机加速上限
+const float MIN_SPEED  = BASE_SPEED - 3.0f; // 随机减速下限
 
 static float GenerateGaussianNoise(void)
 {
@@ -118,12 +134,25 @@ static float GimbalSpeedFromSwitches(void)
     if (switch_is_down(remote_data->rc.switch_gimbal_speed)) return 2.512f;
     if (switch_is_mid(remote_data->rc.switch_gimbal_speed)) return 8.0f;
 
-    float speed = GIMBAL_RANDOM_SPEED_MEAN +
-      GIMBAL_RANDOM_SPEED_STDDEV *  Slow_Gaussian_Noise();
-    if (speed < GIMBAL_RANDOM_SPEED_MIN) speed = GIMBAL_RANDOM_SPEED_MIN;
-    if (speed > GIMBAL_RANDOM_SPEED_MAX) speed = GIMBAL_RANDOM_SPEED_MAX;
-    return speed;
+    //白噪声项: dW = N(0,1) * sqrt(dt)
+    float dW = GenerateGaussianNoise() * sqrtf(CTRL_DT);
+    //计算加速度增量 da
+    float da = -OU_THETA * current_accel * CTRL_DT + OU_SIGMA * dW;
+    current_accel += da;
+    //加速度积分得到平滑的速度
+    rotate_speed += current_accel * CTRL_DT;
+    //限幅保护
+    if (rotate_speed > MAX_SPEED) {
+        rotate_speed = MAX_SPEED;
+        // 撞墙后加速度清零或反向，防止积分饱和导致卡死在最高速
+        if (current_accel > 0.0f) current_accel = -current_accel * 0.5f;
+    } else if (rotate_speed < MIN_SPEED) {
+        rotate_speed = MIN_SPEED;
+        if (current_accel < 0.0f) current_accel = -current_accel * 0.5f;
+    }
+    return rotate_speed;
 }
+
 //旋钮控制底盘速度
 static float KnobToChassisSpeed(uint16_t knob)
 {
@@ -179,6 +208,7 @@ void RobotCmdTask(void)
         gimbal_cmd_msg = (Gimbal_Cmd_t){0};
         PubPushMessage(chassis_cmd_pub, &chassis_cmd_msg);
         PubPushMessage(gimbal_cmd_pub, &gimbal_cmd_msg);
+
         return;
     }
 

@@ -15,11 +15,11 @@
 
 #define CHASSIS_WHEEL_RADIUS_M 0.0765f//轮半径
 #define CHASSIS_REDUCTION_RATIO 19.0f//减速比
-#define CHASSIS_ODOMETRY_LEG_M 2.0f//运行距离
+#define CHASSIS_ODOMETRY_LEG_M 1.3f//运行距离
 #define CHASSIS_TASK_DT_S 0.001f
 /* Planner units are wheel linear speed (m/s). */
-#define CHASSIS_SAME_DIRECTION_ACCEL 4.0f
-#define CHASSIS_REVERSE_ACCEL 6.0f
+#define CHASSIS_SAME_DIRECTION_ACCEL 6.0f
+#define CHASSIS_REVERSE_ACCEL 10.0f
 
 static DJIMotorInstance *motor_lf, *motor_rf;
 static uint8_t chassis_enabled;
@@ -64,17 +64,22 @@ static void ChassisResetOdometry(void)
     odometry_initialized = 0U;
     odometry_direction = 1;
 }
-//设置循环长度
-static float ChassisOdometrySpeedRef(float speed_mps)
+static void ChassisOdometrySpeedRef(float speed_mps,
+                                    float *left_ref_deg,
+                                    float *right_ref_deg)
 {
+    if (speed_mps <= 0.0f)
+    {
+        *left_ref_deg = motor_lf->measure.total_angle;
+        *right_ref_deg = motor_rf->measure.total_angle;
+        ChassisResetOdometry();
+        return;
+    }
+
     if (!odometry_initialized)
     {
         odometry_start_l_deg = motor_lf->measure.total_angle;
         odometry_start_r_deg = motor_rf->measure.total_angle;
-        if (speed_mps <= 0.0f)
-        {
-            return 0.0f;
-        }
         odometry_initialized = 1U;
     }
 
@@ -99,7 +104,13 @@ static float ChassisOdometrySpeedRef(float speed_mps)
         }
     }
 
-    return (float)odometry_direction * speed_mps;
+    float leg_angle_deg = CHASSIS_ODOMETRY_LEG_M /
+                          CHASSIS_WHEEL_RADIUS_M * CHASSIS_REDUCTION_RATIO * RAD_2_DEGREE;
+    float signed_leg_angle_deg = (float)odometry_direction * leg_angle_deg;
+    *left_ref_deg = odometry_start_l_deg + signed_leg_angle_deg;
+    /* The right motor is mechanically reversed and its reference is negated
+       inside DJIMotorControl, so use the opposite raw encoder direction. */
+    *right_ref_deg = odometry_start_r_deg - signed_leg_angle_deg;
 }
 
 static void ChassisSetControlMode(Chassis_Control_Mode_e mode)
@@ -132,6 +143,15 @@ void ChassisInit() {
     Motor_Init_Config_s chassis_motor_config = {
         .can_init_config.can_handle = &hcan,
         .controller_param_init_config = {
+            .angle_PID = {
+                .Kp = 10.0f,//两个都可以50
+                .Ki = 0.0f,//1,//0
+                .Kd = 0.01f,//0.0f
+                .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
+                .IntegralLimit = 0.3f,
+                .MaxOut = 5,
+
+        },
             .speed_PID = {
                 .Kp = 1.0f,
                 .Ki = 0.0f,
@@ -140,20 +160,13 @@ void ChassisInit() {
                 .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
                 .MaxOut = 30000,
         },
-        .current_PID = {
-            .Kp = 0.0f,
-            .Ki = 0.0f,
-            .Kd = 0.0f,
-            .IntegralLimit = 3000,
-            .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
-            .MaxOut = 15000,
-    },
+
 },
 .controller_setting_init_config = {
     .angle_feedback_source = MOTOR_FEED,
     .speed_feedback_source = MOTOR_FEED,
-    .outer_loop_type = SPEED_LOOP,
-    .close_loop_type = SPEED_LOOP, // CURRENT_LOOP,
+    .outer_loop_type = ANGLE_LOOP,
+    .close_loop_type = ANGLE_AND_SPEED_LOOP, // CURRENT_LOOP,
     .power_limit_flag = POWER_LIMIT_ON,
 },
 .motor_type = M3508,
@@ -274,7 +287,14 @@ void ChassisTask(void)
     }
     else if (active_control_mode == CHASSIS_MODE_ODOMETRY)
     {
-        chassis_speed_vx = ChassisOdometrySpeedRef(chassis_cmd.vx_mps);
+        float left_position_ref_deg;
+        float right_position_ref_deg;
+        ChassisOdometrySpeedRef(chassis_cmd.vx_mps,
+                                &left_position_ref_deg,
+                                &right_position_ref_deg);
+        DJIMotorSetRef(motor_lf, left_position_ref_deg);
+        DJIMotorSetRef(motor_rf, right_position_ref_deg);
+        return;
     }
 
     float left_target_speed = chassis_speed_vx - chassis_speed_vy;

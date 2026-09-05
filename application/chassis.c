@@ -14,13 +14,12 @@
 #include <math.h>
 
 #define CHASSIS_WHEEL_RADIUS_M 0.0765f//轮半径
-#define CHASSIS_REDUCTION_RATIO 19.0f//减速比
-#define CHASSIS_ODOMETRY_LEG_M 1.3f//运行距离
+#define CHASSIS_REDUCTION_RATIO 19.2f//减速比
+#define CHASSIS_ODOMETRY_LEG_M 1.0f//运行距离
 #define CHASSIS_TASK_DT_S 0.001f
-/* Planner units are wheel linear speed (m/s). */
-#define CHASSIS_SAME_DIRECTION_ACCEL 6.0f
-#define CHASSIS_REVERSE_ACCEL 10.0f
-
+#define CHASSIS_SAME_DIRECTION_ACCEL 2.0f
+#define CHASSIS_REVERSE_ACCEL 3.0f
+#define CHASSIS_ODOMETRY_ZERO_SPEED_MPS 0.02f
 static DJIMotorInstance *motor_lf, *motor_rf;
 static uint8_t chassis_enabled;
 static uint8_t chassis_feedback_blocked;
@@ -31,9 +30,12 @@ static uint8_t odometry_initialized;
 static int8_t odometry_direction;
 static float odometry_start_l_deg;
 static float odometry_start_r_deg;
+static uint8_t odometry_reversing;
 static SlopePlanner_t left_speed_planner;
 static SlopePlanner_t right_speed_planner;
-
+float left_planned_speed = 0;
+float right_planned_speed = 0 ;
+float travelled_distance ;
 static void ChassisResetSpeedPlanners(void)
 {
     SlopePlanner_Init(&left_speed_planner);
@@ -63,23 +65,19 @@ static void ChassisResetOdometry(void)
 {
     odometry_initialized = 0U;
     odometry_direction = 1;
+    odometry_reversing = 0U;
 }
-static void ChassisOdometrySpeedRef(float speed_mps,
-                                    float *left_ref_deg,
-                                    float *right_ref_deg)
+//设置循环长度
+static float ChassisOdometrySpeedRef(float speed_mps)
 {
-    if (speed_mps <= 0.0f)
-    {
-        *left_ref_deg = motor_lf->measure.total_angle;
-        *right_ref_deg = motor_rf->measure.total_angle;
-        ChassisResetOdometry();
-        return;
-    }
-
     if (!odometry_initialized)
     {
         odometry_start_l_deg = motor_lf->measure.total_angle;
         odometry_start_r_deg = motor_rf->measure.total_angle;
+        if (speed_mps <= 0.0f)
+        {
+            return 0.0f;
+        }
         odometry_initialized = 1U;
     }
 
@@ -87,13 +85,27 @@ static void ChassisOdometrySpeedRef(float speed_mps,
         motor_lf->measure.total_angle - odometry_start_l_deg));
     float right_distance = fabsf(ChassisMotorAngleToDistance(
         motor_rf->measure.total_angle - odometry_start_r_deg));
-    float travelled_distance = (left_distance + right_distance) * 0.5f;
+     travelled_distance = (left_distance + right_distance) * 0.5f;
+    float chassis_speed =
+        (motor_lf->measure.speed_ms - motor_rf->measure.speed_ms) * 0.5f;
+
+    if (odometry_reversing)
+    {
+        if ((float)odometry_direction * chassis_speed > CHASSIS_ODOMETRY_ZERO_SPEED_MPS)
+        {
+            /* Start the next leg from the actual position after the vehicle
+               has completed the direction change, keeping distance continuous. */
+            odometry_start_l_deg = motor_lf->measure.total_angle;
+            odometry_start_r_deg = motor_rf->measure.total_angle;
+            odometry_reversing = 0U;
+        }
+        return (float)odometry_direction * speed_mps;
+    }
 
     if (travelled_distance >= CHASSIS_ODOMETRY_LEG_M)
     {
-        odometry_start_l_deg = motor_lf->measure.total_angle;
-        odometry_start_r_deg = motor_rf->measure.total_angle;
         odometry_direction = (int8_t)-odometry_direction;
+        odometry_reversing = 1U;
         if (odometry_direction > 0)
         {
             LOGINFO("[chassis] Odometry leg complete, moving forward");
@@ -104,13 +116,7 @@ static void ChassisOdometrySpeedRef(float speed_mps,
         }
     }
 
-    float leg_angle_deg = CHASSIS_ODOMETRY_LEG_M /
-                          CHASSIS_WHEEL_RADIUS_M * CHASSIS_REDUCTION_RATIO * RAD_2_DEGREE;
-    float signed_leg_angle_deg = (float)odometry_direction * leg_angle_deg;
-    *left_ref_deg = odometry_start_l_deg + signed_leg_angle_deg;
-    /* The right motor is mechanically reversed and its reference is negated
-       inside DJIMotorControl, so use the opposite raw encoder direction. */
-    *right_ref_deg = odometry_start_r_deg - signed_leg_angle_deg;
+    return (float)odometry_direction * speed_mps;
 }
 
 static void ChassisSetControlMode(Chassis_Control_Mode_e mode)
@@ -143,30 +149,29 @@ void ChassisInit() {
     Motor_Init_Config_s chassis_motor_config = {
         .can_init_config.can_handle = &hcan,
         .controller_param_init_config = {
-            .angle_PID = {
-                .Kp = 10.0f,//两个都可以50
-                .Ki = 0.0f,//1,//0
-                .Kd = 0.01f,//0.0f
-                .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
-                .IntegralLimit = 0.3f,
-                .MaxOut = 5,
-
-        },
             .speed_PID = {
-                .Kp = 1.0f,
+                .Kp = 3.0f,
                 .Ki = 0.0f,
                 .Kd = 0.0f,
+                .Kf = 3.0f,
                 .IntegralLimit = 3000,
-                .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
+                .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement | PID_FeedForward,
                 .MaxOut = 30000,
         },
-
+        .current_PID = {
+            .Kp = 0.0f,
+            .Ki = 0.0f,
+            .Kd = 0.0f,
+            .IntegralLimit = 3000,
+            .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
+            .MaxOut = 15000,
+    },
 },
 .controller_setting_init_config = {
     .angle_feedback_source = MOTOR_FEED,
     .speed_feedback_source = MOTOR_FEED,
-    .outer_loop_type = ANGLE_LOOP,
-    .close_loop_type = ANGLE_AND_SPEED_LOOP, // CURRENT_LOOP,
+    .outer_loop_type = SPEED_LOOP,
+    .close_loop_type = SPEED_LOOP, // CURRENT_LOOP,
     .power_limit_flag = POWER_LIMIT_ON,
 },
 .motor_type = M3508,
@@ -241,11 +246,11 @@ void ChassisTask(void)
     if (motor_lf == NULL || motor_rf == NULL) return;
     if (!chassis_cmd.enabled || !chassis_enabled)
     {
-        float left_planned_speed = SlopePlanner_Update(&left_speed_planner,
-                                                       CHASSIS_SAME_DIRECTION_ACCEL,
-                                                       CHASSIS_REVERSE_ACCEL, 0.0f,
-                                                       0.0f, NAN, CHASSIS_TASK_DT_S);
-        float right_planned_speed = SlopePlanner_Update(&right_speed_planner,
+        left_planned_speed = SlopePlanner_Update(&left_speed_planner,
+                                                 CHASSIS_SAME_DIRECTION_ACCEL,
+                                                 CHASSIS_REVERSE_ACCEL, 0.0f,
+                                                 0.0f, NAN, CHASSIS_TASK_DT_S);
+        right_planned_speed = SlopePlanner_Update(&right_speed_planner,
                                                         CHASSIS_SAME_DIRECTION_ACCEL,
                                                         CHASSIS_REVERSE_ACCEL, 0.0f,
                                                         0.0f, NAN, CHASSIS_TASK_DT_S);
@@ -287,25 +292,18 @@ void ChassisTask(void)
     }
     else if (active_control_mode == CHASSIS_MODE_ODOMETRY)
     {
-        float left_position_ref_deg;
-        float right_position_ref_deg;
-        ChassisOdometrySpeedRef(chassis_cmd.vx_mps,
-                                &left_position_ref_deg,
-                                &right_position_ref_deg);
-        DJIMotorSetRef(motor_lf, left_position_ref_deg);
-        DJIMotorSetRef(motor_rf, right_position_ref_deg);
-        return;
+        chassis_speed_vx = ChassisOdometrySpeedRef(chassis_cmd.vx_mps);
     }
 
-    float left_target_speed = chassis_speed_vx - chassis_speed_vy;
-    float right_target_speed = chassis_speed_vx + chassis_speed_vy;
-    float left_planned_speed = SlopePlanner_Update(&left_speed_planner,
-                                                   CHASSIS_SAME_DIRECTION_ACCEL,
-                                                   CHASSIS_REVERSE_ACCEL, 1.0f,
-                                                   left_target_speed,
-                                                   motor_lf->measure.speed_ms,
-                                                   CHASSIS_TASK_DT_S);
-    float right_planned_speed = SlopePlanner_Update(&right_speed_planner,
+    float left_target_speed = chassis_speed_vx ;
+    float right_target_speed = chassis_speed_vx;
+   left_planned_speed = SlopePlanner_Update(&left_speed_planner,
+                                            CHASSIS_SAME_DIRECTION_ACCEL,
+                                            CHASSIS_REVERSE_ACCEL, 1.0f,
+                                            left_target_speed,
+                                            motor_lf->measure.speed_ms,
+                                            CHASSIS_TASK_DT_S);
+   right_planned_speed = SlopePlanner_Update(&right_speed_planner,
                                                     CHASSIS_SAME_DIRECTION_ACCEL,
                                                     CHASSIS_REVERSE_ACCEL, 1.0f,
                                                     right_target_speed,

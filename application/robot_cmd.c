@@ -10,6 +10,7 @@
 
 #include "general_def.h"
 
+
 #define RC_CHANNEL_SCALE (1.0f / 500.0f)
 #define CHASSIS_SPEED_MAX 2.0f
 #define CHASSIS_KNOB_ZERO_MAX 1050U
@@ -30,7 +31,6 @@ static Publisher_t *chassis_cmd_pub;
 static Publisher_t *gimbal_cmd_pub;
 static Chassis_Cmd_t chassis_cmd_msg;
 static Gimbal_Cmd_t gimbal_cmd_msg;
-
 // --- 全局或静态变量定义区 (放在函数外或设为 static) ---
 static float current_accel = 0.0f;               // 当前加速度
 static float rotate_speed = 2.0f * PI * 0.5f;    // 当前速度 (初始值)
@@ -68,19 +68,7 @@ static float GenerateGaussianNoise(void)
     has_spare = 1U;
     return u * s;
 }
-static float Slow_Gaussian_Noise(void)
-{
-    static float noise_out = 0;
-    static int cnt = 0;
-    const int skip = 20; // 每20次循环，才更新一次噪声
-    cnt++;
-    if(cnt >= skip)
-    {
-        noise_out =  GenerateGaussianNoise();
-        cnt = 0;
-    }
-    return noise_out;
-}
+
 static void SetMotorEnabled(uint8_t enabled)
 {
     uint8_t requested_state = enabled ? 1U : 0U;
@@ -194,6 +182,7 @@ void RobotCmdInit(void)
     chassis_cmd_pub = PubRegister("chassis_cmd", sizeof(Chassis_Cmd_t));
     gimbal_cmd_pub = PubRegister("gimbal_cmd", sizeof(Gimbal_Cmd_t));
     LOGINFO("[robot_cmd] Initialized; motors disabled");
+
 }
 
 void RobotCmdTask(void)

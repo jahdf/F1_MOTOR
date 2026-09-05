@@ -22,7 +22,7 @@ void GimbalInit(void)
         },
         .controller_param_init_config = {
             .speed_PID = {
-                .Kp = 22.0f,
+                .Kp = 17.0f,
                 .Ki = 0.5f,
                 .Kd = 0.001f,
                 .Kf = 0.0f,

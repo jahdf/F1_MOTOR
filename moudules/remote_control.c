@@ -4,6 +4,7 @@
 #include "usart.h"
 #include "bsp_log.h"
 #include "string.h"
+#include "energy_mechanism.h"
 
 #define REMOTE_CONTROL_FRAME_SIZE 32U
 #define REMOTE_CONTROL_CHANNEL_COUNT RC_IBUS_CHANNEL_COUNT
@@ -88,10 +89,10 @@ static void DecodeFrame(const uint8_t *frame)
     decoded.rc.knob_chassis = DecodeIbusChannel(frame, 4U);
     decoded.rc.knob_gimbal = DecodeIbusChannel(frame, 5U);
     decoded.rc.dial = (int16_t)decoded.rc.knob_chassis - RC_CH_VALUE_OFFSET;
-    decoded.rc.switch_chassis_mode = DecodeSwitch(DecodeIbusChannel(frame, 6U));//通道SWA设置底盘模式
-    decoded.rc.switch_enable = DecodeSwitch(DecodeIbusChannel(frame, 7U));// CH8, 两档使能
-    decoded.rc.switch_gimbal_speed = DecodeSwitch(DecodeIbusChannel(frame, 8U));// CH9, 云台速度档位
-    decoded.rc.switch_gimbal_speed_enable = DecodeSwitch(DecodeIbusChannel(frame, 9U));// CH10, CH9使能
+    decoded.rc.switch_energy_mode = DecodeSwitch(DecodeIbusChannel(frame, 6U));// CH7, 蓝/红
+    decoded.rc.switch_enable = DecodeSwitch(DecodeIbusChannel(frame, 7U));// CH8, 电机使能
+    decoded.rc.switch_cloor = DecodeSwitch(DecodeIbusChannel(frame, 8U));// CH9, 大符复位/激活
+    decoded.rc.switch_gimbal_speed_enable = DecodeSwitch(DecodeIbusChannel(frame, 9U));// CH10, 小/大符
     memset(&decoded.mouse, 0, sizeof(decoded.mouse));
     memset(&decoded.key, 0, sizeof(decoded.key));
 
@@ -199,6 +200,11 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     {
         RemoteControlRxByte(rc_rx_byte);
         HAL_UART_Receive_IT(&huart1, &rc_rx_byte, 1U);
+    }
+    else if (huart->Instance == USART2)
+    {
+        EnergyMechanismRxByte(energy_rx_byte);
+        HAL_UART_Receive_IT(&huart2, &energy_rx_byte, 1U);
     }
 }
 

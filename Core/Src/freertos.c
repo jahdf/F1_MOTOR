@@ -31,6 +31,7 @@
 #include "daemon.h"
 #include "gimbal.h"
 #include "remote_control.h"
+#include "energy_mechanism.h"
 #include "robot_cmd.h"
 /* USER CODE END Includes */
 
@@ -173,13 +174,11 @@ void StartMotorTask(void *argument)
   /* USER CODE BEGIN StartMotorTask */
   DWT_Init(72);
   ChassisInit();
-  GimbalInit();
 
   /* Infinite loop */
   for(;;)
   {
     ChassisTask();
-    GimbalTask();
     DJIMotorControl();
     osDelay(1);
   }
@@ -217,6 +216,7 @@ void StartRobotCmdTask(void *argument)
   /* USER CODE BEGIN StartRobotCmdTask */
   RobotCmdInit();
   RemoteControlStartReceive();
+  EnergyMechanismStartReceive();
   /* Infinite loop */
   for(;;)
   {

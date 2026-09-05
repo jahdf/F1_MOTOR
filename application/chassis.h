@@ -17,14 +17,13 @@ typedef enum
 
 typedef struct
 {
-    float vx_mps;
-    float vy_mps;
+    float wz;
     uint8_t enabled;
     Chassis_Control_Mode_e control_mode;
 } Chassis_Cmd_t;
 
 void ChassisInit();
-void ChassisSetRef(float chassis_cmd_vx);
+void ChassisSetRef(float chassis_cmd_wz);
 void ChassisSetEnabled(uint8_t enabled);
 void ChassisTask(void);
 

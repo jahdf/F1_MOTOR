@@ -52,6 +52,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     application/chassis.c
+    application/energy_mechanism.c
     application/gimbal.c
     application/robot_cmd.c
     moudules/controller.c

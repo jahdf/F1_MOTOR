@@ -17,13 +17,15 @@ uint8_t energy_rx_byte;
 static uint8_t rx_frame[ENERGY_FRAME_SIZE];
 static uint8_t rx_index;
 static volatile EnergyMechanismStatus_e status;
-static uint8_t status_initialized;
+static volatile uint8_t status_initialized;
 static uint8_t color_switch_last;
 static uint8_t size_switch_last;
 static uint8_t rune_switch_last;
 static uint8_t switches_initialized;
 static volatile uint8_t blue;
 static volatile uint8_t large;
+static uint8_t tx_frame[ENERGY_FRAME_SIZE];
+static volatile uint8_t tx_busy;
 
 static uint8_t IsTwoPosition(uint8_t value)
 {
@@ -32,10 +34,15 @@ static uint8_t IsTwoPosition(uint8_t value)
 
 static void SendCommand(uint8_t command, uint8_t value)
 {
-    uint8_t frame[ENERGY_FRAME_SIZE] = {
-        ENERGY_FRAME_HEAD_0, ENERGY_FRAME_HEAD_1, command, value
-    };
-    (void)HAL_UART_Transmit(&huart2, frame, ENERGY_FRAME_SIZE, 20U);
+    if (tx_busy) return;
+    tx_frame[0] = ENERGY_FRAME_HEAD_0;
+    tx_frame[1] = ENERGY_FRAME_HEAD_1;
+    tx_frame[2] = command;
+    tx_frame[3] = value;
+    if (HAL_UART_Transmit_IT(&huart2, tx_frame, ENERGY_FRAME_SIZE) == HAL_OK)
+    {
+        tx_busy = 1U;
+    }
 }
 
 void EnergyMechanismInit(void)
@@ -44,8 +51,17 @@ void EnergyMechanismInit(void)
     status = ENERGY_STATUS_UNKNOWN;
     status_initialized = 0U;
     switches_initialized = 0U;
+    tx_busy = 0U;
     blue = 1U;
     large = 0U;
+}
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART2)
+    {
+        tx_busy = 0U;
+    }
 }
 
 void EnergyMechanismStartReceive(void)

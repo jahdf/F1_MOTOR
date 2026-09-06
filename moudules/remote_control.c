@@ -89,10 +89,10 @@ static void DecodeFrame(const uint8_t *frame)
     decoded.rc.knob_chassis = DecodeIbusChannel(frame, 4U);
     decoded.rc.knob_gimbal = DecodeIbusChannel(frame, 5U);
     decoded.rc.dial = (int16_t)decoded.rc.knob_chassis - RC_CH_VALUE_OFFSET;
-    decoded.rc.switch_energy_mode = DecodeSwitch(DecodeIbusChannel(frame, 6U));// CH7, 蓝/红
+    decoded.rc.switch_cloor = DecodeSwitch(DecodeIbusChannel(frame, 6U));// CH7, 蓝/红
     decoded.rc.switch_enable = DecodeSwitch(DecodeIbusChannel(frame, 7U));// CH8, 电机使能
-    decoded.rc.switch_cloor = DecodeSwitch(DecodeIbusChannel(frame, 8U));// CH9, 大符复位/激活
-    decoded.rc.switch_gimbal_speed_enable = DecodeSwitch(DecodeIbusChannel(frame, 9U));// CH10, 小/大符
+    decoded.rc.switch_big = DecodeSwitch(DecodeIbusChannel(frame, 8U));// CH9, 大符复位/激活
+    decoded.rc.switch_energy_mode = DecodeSwitch(DecodeIbusChannel(frame, 9U));// CH10, 小/大符
     memset(&decoded.mouse, 0, sizeof(decoded.mouse));
     memset(&decoded.key, 0, sizeof(decoded.key));
 

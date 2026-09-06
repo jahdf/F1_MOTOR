@@ -36,7 +36,12 @@ static float EnergyRandomRange(float min_value, float max_value)
 static float EnergySpeedWz(void)
 {
     EnergyMechanismStatus_e status = EnergyMechanismGetStatus();
-    if (status == ENERGY_STATUS_UNKNOWN) return 0.0f;
+
+
+    if (status == ENERGY_STATUS_UNKNOWN)
+    {
+        status = ENERGY_STATUS_INACTIVE;
+    }
 
     if (status != energy_last_status)
     {
@@ -117,9 +122,9 @@ void RobotCmdTask(void)
         SetMotorEnabled(1U);
     }
 
-    EnergyMechanismUpdateSwitches(remote_data->rc.switch_energy_mode,
-                                  remote_data->rc.switch_gimbal_speed_enable,
-                                  remote_data->rc.switch_cloor,
+    EnergyMechanismUpdateSwitches(remote_data->rc.switch_cloor,
+                                  remote_data->rc.switch_energy_mode,
+                                  remote_data->rc.switch_big,
                                   motor_enabled);
 
     if (!motor_enabled)
@@ -129,7 +134,7 @@ void RobotCmdTask(void)
         return;
     }
 
-    /* Calculate WZ here, then publish it to chassis.c. */
+
     chassis_cmd_msg.wz = EnergySpeedWz();
     chassis_cmd_msg.enabled = 1U;
     chassis_cmd_msg.control_mode = CHASSIS_MODE_JOYSTICK;

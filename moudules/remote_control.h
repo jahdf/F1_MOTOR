@@ -60,9 +60,9 @@ typedef struct
         uint16_t knob_chassis;
         uint16_t knob_gimbal;
         uint8_t switch_enable;
-        uint8_t switch_energy_mode;
         uint8_t switch_cloor;
-        uint8_t switch_gimbal_speed_enable;
+        uint8_t switch_big;
+        uint8_t switch_energy_mode;
     } rc;
     struct
     {

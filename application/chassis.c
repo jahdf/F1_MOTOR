@@ -28,7 +28,7 @@ void ChassisInit(void)
         },
         .controller_param_init_config = {
             .speed_PID = {
-                .Kp = 3.0f,
+                .Kp = 0.8f,
                 .Ki = 0.0f,
                 .Kd = 0.0f,
                 .Kf = 0.0f,

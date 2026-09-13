@@ -31,7 +31,7 @@ void ChassisInit(void)
                 .Kp = 3.0f,
                 .Ki = 0.0f,
                 .Kd = 0.0f,
-                .Kf = 3.0f,
+                .Kf = 0.0f,
                 .IntegralLimit = 3000,
                 .Improve = PID_Trapezoid_Intergral |
                            PID_Integral_Limit |
@@ -136,7 +136,6 @@ void ChassisTask(void)
         DJIMotorEnable(motor_lf);
         LOGINFO("[chassis] Encoder feedback recovered");
     }
-
-    /* chassis_cmd.wz is rad/s; DJI speed references are deg/s. */
-    DJIMotorSetRef(motor_lf, chassis_cmd.wz * RAD_2_DEGREE);
+    //19.2电机减速比，3是齿轮的传动比
+    DJIMotorSetRef(motor_lf, chassis_cmd.wz * RAD_2_DEGREE * 19.2 * 3);
 }

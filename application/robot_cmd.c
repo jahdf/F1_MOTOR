@@ -135,7 +135,7 @@ void RobotCmdTask(void)
     }
 
 
-    chassis_cmd_msg.wz = EnergySpeedWz();
+    chassis_cmd_msg.wz =  EnergySpeedWz();
     chassis_cmd_msg.enabled = 1U;
     chassis_cmd_msg.control_mode = CHASSIS_MODE_JOYSTICK;
     PubPushMessage(chassis_cmd_pub, &chassis_cmd_msg);

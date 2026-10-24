@@ -52,7 +52,12 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
-
+/* Debugger diagnostics: 0 = none, 1 = stack overflow, 2 = RTOS heap failure. */
+volatile uint32_t rtos_fault_reason;
+TaskHandle_t volatile rtos_fault_task;
+const char * volatile rtos_fault_task_name;
+/* Historical minimum unused task stack, in bytes; sampled once per second. */
+volatile uint32_t robot_cmd_stack_free_min_bytes;
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -79,7 +84,7 @@ const osThreadAttr_t DaemonTask_attributes = {
 osThreadId_t RobotCmdTaskHandle;
 const osThreadAttr_t RobotCmdTask_attributes = {
   .name = "RobotCmdTask",
-  .stack_size = 128 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 
@@ -135,7 +140,10 @@ void MX_FREERTOS_Init(void) {
   RobotCmdTaskHandle = osThreadNew(StartRobotCmdTask, NULL, &RobotCmdTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
+  configASSERT(defaultTaskHandle != NULL);
+  configASSERT(MotorTaskHandle != NULL);
+  configASSERT(DaemonTaskHandle != NULL);
+  configASSERT(RobotCmdTaskHandle != NULL);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -157,7 +165,10 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    robot_cmd_stack_free_min_bytes =
+        (uint32_t)uxTaskGetStackHighWaterMark((TaskHandle_t)RobotCmdTaskHandle) *
+        sizeof(StackType_t);
+    osDelay(1000);
   }
   /* USER CODE END StartDefaultTask */
 }
@@ -228,6 +239,22 @@ void StartRobotCmdTask(void *argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
+void vApplicationStackOverflowHook(TaskHandle_t task, char *task_name)
+{
+  /* Do not log or allocate memory when the stack is already damaged. */
+  taskDISABLE_INTERRUPTS();
+  rtos_fault_task = task;
+  rtos_fault_task_name = task_name;
+  rtos_fault_reason = 1U;
+  for (;;) {}
+}
+
+void vApplicationMallocFailedHook(void)
+{
+  taskDISABLE_INTERRUPTS();
+  rtos_fault_reason = 2U;
+  for (;;) {}
+}
 
 /* USER CODE END Application */
 

@@ -28,11 +28,12 @@ void ChassisInit(void)
         },
         .controller_param_init_config = {
             .speed_PID = {
-                .Kp = 0.8f,
-                .Ki = 0.0f,
+                .Kp = 0.9f,
+                .Ki = 0.1f,
                 .Kd = 0.0f,
-                .Kf = 0.0f,
-                .IntegralLimit = 3000,
+                .Kf = 0.2f, // Initial tuning value; feedforward = Kf * motor speed ref (deg/s).
+                .ff_type = FF_Proportional,
+                .IntegralLimit = 300,
                 .Improve = PID_Trapezoid_Intergral |
                            PID_Integral_Limit |
                            PID_Derivative_On_Measurement |

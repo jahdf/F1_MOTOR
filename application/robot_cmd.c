@@ -13,7 +13,7 @@ static uint8_t motor_enabled;
 static uint8_t arm_ready;
 static Publisher_t *chassis_cmd_pub;
 static Chassis_Cmd_t chassis_cmd_msg;
-static EnergyMechanismStatus_e energy_last_status;
+static uint8_t energy_variable_speed_last;
 static float energy_a;
 static float energy_omega;
 static uint32_t energy_start_tick;
@@ -33,32 +33,26 @@ static float EnergyRandomRange(float min_value, float max_value)
            ((float)(energy_random_state & 0x00ffffffU) / 16777215.0f);
 }
 
-static float EnergySpeedWz(void)
+static float EnergySpeedWz(uint8_t switch_big)
 {
-    EnergyMechanismStatus_e status = EnergyMechanismGetStatus();
+    uint8_t variable_speed = (uint8_t)(EnergyMechanismIsLarge() &&
+                                       switch_big == RC_SW_DOWN);
 
-
-    if (status == ENERGY_STATUS_UNKNOWN)
+    if (variable_speed && !energy_variable_speed_last)
     {
-        status = ENERGY_STATUS_INACTIVE;
+        energy_a = EnergyRandomRange(ENERGY_A_MIN, ENERGY_A_MAX);
+        energy_omega = EnergyRandomRange(ENERGY_OMEGA_MIN, ENERGY_OMEGA_MAX);
+        energy_start_tick = HAL_GetTick();
     }
-
-    if (status != energy_last_status)
-    {
-        if (status == ENERGY_STATUS_ACTIVATING)
-        {
-            energy_a = EnergyRandomRange(ENERGY_A_MIN, ENERGY_A_MAX);
-            energy_omega = EnergyRandomRange(ENERGY_OMEGA_MIN, ENERGY_OMEGA_MAX);
-            energy_start_tick = HAL_GetTick();
-        }
-        energy_last_status = status;
-    }
+    energy_variable_speed_last = variable_speed;
 
     float speed = ENERGY_FIXED_SPEED_RAD_S;
-    if (EnergyMechanismIsLarge() && status == ENERGY_STATUS_ACTIVATING)
+    if (variable_speed)
     {
         float elapsed_s = (float)(HAL_GetTick() - energy_start_tick) * 0.001f;
-        speed = energy_a * sinf(energy_omega * elapsed_s) +
+        // Keep sinf out of its large-argument, high-stack range reduction path.
+        float phase = fmodf(energy_omega * elapsed_s, 2.0f * PI);
+        speed = energy_a * sinf(phase) +
                 (ENERGY_B - energy_a);
     }
     return EnergyMechanismIsBlue() ? speed : -speed;
@@ -93,7 +87,7 @@ void RobotCmdInit(void)
     remote_data = RemoteControlGetData();
     motor_enabled = 0U;
     arm_ready = 0U;
-    energy_last_status = ENERGY_STATUS_UNKNOWN;
+    energy_variable_speed_last = 0U;
     energy_a = ENERGY_A_MIN;
     energy_omega = ENERGY_OMEGA_MIN;
     energy_start_tick = HAL_GetTick();
@@ -135,7 +129,7 @@ void RobotCmdTask(void)
     }
 
 
-    chassis_cmd_msg.wz =  EnergySpeedWz();
+    chassis_cmd_msg.wz = EnergySpeedWz(remote_data->rc.switch_big);
     chassis_cmd_msg.enabled = 1U;
     chassis_cmd_msg.control_mode = CHASSIS_MODE_JOYSTICK;
     PubPushMessage(chassis_cmd_pub, &chassis_cmd_msg);

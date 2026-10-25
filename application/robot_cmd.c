@@ -24,7 +24,7 @@ static uint32_t energy_random_state = 0x13579BDFU;
 #define ENERGY_A_MAX 1.045f
 #define ENERGY_OMEGA_MIN 1.884f
 #define ENERGY_OMEGA_MAX 2.000f
-#define ENERGY_B 2.090f
+#define ENERGY_B 2.590f
 
 static float EnergyRandomRange(float min_value, float max_value)
 {

@@ -12,6 +12,10 @@
 #define ENERGY_CMD_COLOR 0x02U
 #define ENERGY_CMD_ACTIVATE 0x03U
 #define ENERGY_CMD_RESET 0x04U
+#define ENERGY_MODE_BIG 0x01U
+#define ENERGY_MODE_SMALL 0x06U
+#define ENERGY_COLOR_RED 0x02U
+#define ENERGY_COLOR_BLUE 0x05U
 
 uint8_t energy_rx_byte;
 static uint8_t rx_frame[ENERGY_FRAME_SIZE];
@@ -127,8 +131,8 @@ void EnergyMechanismUpdateSwitches(uint8_t color_switch,
         size_switch_last = size_switch;
         rune_switch_last = rune_switch;
         switches_initialized = 1U;
-        if (switch_is_up(color_switch)) blue = 1U;
-        else if (switch_is_down(color_switch)) blue = 0U;
+        if (switch_is_up(color_switch)) blue = 0U;
+        else if (switch_is_down(color_switch)) blue = 1U;
         if (switch_is_up(size_switch)) large = 0U;
         else if (switch_is_down(size_switch)) large = 1U;
         return;
@@ -145,15 +149,23 @@ void EnergyMechanismUpdateSwitches(uint8_t color_switch,
     size_switch_last = size_switch;
     rune_switch_last = rune_switch;
 
-    if (switch_is_up(color_switch)) blue = 1U;
-    else if (switch_is_down(color_switch)) blue = 0U;
+    if (switch_is_up(color_switch)) blue = 0U;
+    else if (switch_is_down(color_switch)) blue = 1U;
     if (switch_is_up(size_switch)) large = 0U;
     else if (switch_is_down(size_switch)) large = 1U;
 
 
     (void)motors_enabled;
-    if (size_changed) SendCommand(ENERGY_CMD_MODE, 0x00U);
-    if (color_changed) SendCommand(ENERGY_CMD_COLOR, 0x01U);
+    if (size_changed)
+    {
+        if (switch_is_down(size_switch)) SendCommand(ENERGY_CMD_MODE, ENERGY_MODE_BIG);
+        else if (switch_is_up(size_switch)) SendCommand(ENERGY_CMD_MODE, ENERGY_MODE_SMALL);
+    }
+    if (color_changed)
+    {
+        if (switch_is_up(color_switch)) SendCommand(ENERGY_CMD_COLOR, ENERGY_COLOR_RED);
+        else if (switch_is_down(color_switch)) SendCommand(ENERGY_CMD_COLOR, ENERGY_COLOR_BLUE);
+    }
     if (rune_changed)
     {
         if (switch_is_up(rune_switch)) SendCommand(ENERGY_CMD_RESET, 0x03U);
